@@ -1,3 +1,19 @@
-"feedback_analytics.db" 
-"customer_feedback_insights.xlsx" 
-"__pycache__/" 
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and virtual environments
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+
+# Local runtime databases and generated spreadsheets
+*.db
+feedback_analytics.db
+*.xlsx
+customer_feedback_insights.xlsx

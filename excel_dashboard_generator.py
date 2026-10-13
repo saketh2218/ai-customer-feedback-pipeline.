@@ -42,7 +42,8 @@ def generate_excel_dashboard():
     # Dual chart: Left = Category counts, Right = Sentiment Distribution
     plt.subplot(1, 2, 1)
     category_counts = df_raw["feedback_category"].value_counts()
-    sns.barplot(x=category_counts.values, y=category_counts.index, palette="Blues_d")
+    sns.barplot(x=category_counts.values, y=category_counts.index,
+                hue=category_counts.index, palette="Blues_d", legend=False)
     plt.title("Feedback Count by Category", fontsize=11, fontweight='bold', pad=10)
     plt.xlabel("Count")
     

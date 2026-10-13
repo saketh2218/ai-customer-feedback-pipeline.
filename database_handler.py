@@ -24,7 +24,11 @@ def init_database():
             sentiment_class TEXT,
             sentiment_score REAL,
             feedback_category TEXT,
-            suggested_action TEXT
+            suggested_action TEXT,
+            confidence_score REAL DEFAULT 0.85,
+            evidence_quote TEXT DEFAULT '',
+            is_conflicted INTEGER DEFAULT 0,
+            human_verified INTEGER DEFAULT 0
         )
     """)
     
@@ -43,19 +47,24 @@ def insert_feedback_data(data):
         cursor.execute("""
             INSERT OR REPLACE INTO customer_feedback (
                 review_id, customer_name, source, rating, review_text, 
-                review_date, sentiment_class, sentiment_score, feedback_category, suggested_action
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                review_date, sentiment_class, sentiment_score, feedback_category, suggested_action,
+                confidence_score, evidence_quote, is_conflicted, human_verified
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             item["review_id"],
-            item["customer_name"],
-            item["source"],
+            item.get("customer_name", "Anonymous"),
+            item.get("source", "Web"),
             item["rating"],
             item["review_text"],
-            item["review_date"],
+            item.get("review_date", "2026-10-11"),
             item["sentiment_class"],
             item["sentiment_score"],
             item["feedback_category"],
-            item["suggested_action"]
+            item["suggested_action"],
+            item.get("confidence_score", 0.85),
+            item.get("evidence_quote", ""),
+            1 if item.get("is_conflicted", False) else 0,
+            1 if item.get("human_verified", False) else 0
         ))
         
     conn.commit()
@@ -107,6 +116,45 @@ def run_analytical_summaries():
     df_neg_actions = query_database(q2)
     
     return df_cat_summary, df_neg_actions
+
+def update_feedback_label(review_id, corrected_class, corrected_score=None, notes=""):
+    """
+    Updates an anomalous or conflicted review with a human-verified ground-truth label.
+    Part of the Human-in-the-Loop (HITL) quality control workflow.
+    """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    if corrected_score is None:
+        score_map = {"Positive": 0.8, "Neutral": 0.0, "Negative": -0.8}
+        corrected_score = score_map.get(corrected_class, 0.0)
+    
+    cursor.execute("""
+        UPDATE customer_feedback
+        SET sentiment_class = ?,
+            sentiment_score = ?,
+            human_verified = 1,
+            is_conflicted = 0
+        WHERE review_id = ?
+    """, (corrected_class, corrected_score, review_id))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_feedback_records(limit=100, conflicted_only=False):
+    """
+    Fetches customer feedback records as a list of dicts.
+    """
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    query = "SELECT * FROM customer_feedback"
+    if conflicted_only:
+        query += " WHERE is_conflicted = 1"
+    query += " ORDER BY review_date DESC LIMIT ?"
+    cursor.execute(query, (limit,))
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
 
 if __name__ == "__main__":
     init_database()
