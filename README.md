@@ -130,53 +130,6 @@ docker compose up --build
 
 ---
 
-## 💡 Technical Interview Q&A Deep Dive
-
-When presenting this project to interviewers, use these technical answers:
-
-### Q1: "How do you know the sentiment label of a given review?"
-1. **Ground Truth Definition:** 
-   In supervised learning, ground truth comes from human annotators using standardized guidelines. Inter-annotator reliability is validated using statistical agreement metrics like **Cohen's Kappa** (for 2 annotators) or **Fleiss' Kappa** (for multiple annotators). An agreement score $> 0.8$ denotes high benchmark validity.
-2. **Metadata as Weak Supervision:**
-   In real-world customer reviews, explicit numerical metadata (such as 1-5 star ratings) serves as a natural proxy:
-   - 1-2 Stars $\rightarrow$ Negative
-   - 3 Stars $\rightarrow$ Neutral
-   - 4-5 Stars $\rightarrow$ Positive
-   However, metadata alone is imperfect due to user error, mixed sentiment ("great UI but terrible speed"), and sarcasm.
-3. **Golden Test Benchmarking:**
-   We maintain a curated, frozen **Golden Test Dataset** (200-500 edge cases containing slang, negations, and domain terminology). We evaluate predictions using **Macro F1-Score**, **Precision**, **Recall**, and **Confusion Matrices** to ensure minority classes are not suppressed.
-
----
-
-### Q2: "How does OpenAI / an LLM identify sentiment internally?"
-1. **Decoder-Only Transformer Architecture:**
-   - **Byte-Pair Encoding (BPE) Tokenization:** Text is decomposed into token embeddings positioned in a multi-dimensional semantic space.
-   - **Multi-Head Self-Attention:** Unlike legacy bag-of-words or TF-IDF models, self-attention computes query-key-value vector dot products across every token in context. It dynamically captures:
-     - **Syntactic Negations:** Inverting valence for "not terrible" (mild positive) vs "terrible" (negative).
-     - **Conditionals & Subjunctive Mood:** Recognizing "I would have loved this app if it didn't crash" as negative despite the word "loved".
-     - **Aspect Binding:** Associating sentiment adjectives to specific nouns (e.g., UI vs Pricing).
-2. **Pre-training & RLHF Alignment:**
-   - Pre-training on vast web-scale corpora allows the model to learn lexical sentiment distributions.
-   - **Reinforcement Learning from Human Feedback (RLHF)** and instruction tuning calibrate the model to evaluate sentiment objectively on specified numerical ranges (-1.0 to +1.0) and emit schema-enforced JSON.
-
----
-
-### Q3: "Do you blindly trust ChatGPT in production?"
-**Resounding NO!** In production ML and AI engineering, blind reliance on LLMs causes silent data corruption, hallucinations, and uncalibrated decisions. We implement 5 layers of defensive engineering:
-
-1. **Rating-Sentiment Incongruence Guardrail:**
-   If a user submits a 1-star rating but the LLM predicts "Positive" (or 5 stars with "Negative"), the system flags the record as `is_conflicted = True` (detecting sarcasm or hallucination) and lowers confidence.
-2. **Dual-Engine Baseline Verification:**
-   We run a deterministic lexicon baseline in tandem with the LLM. If predictions align, confidence is increased; if they diverge, the item is flagged.
-3. **Grounding via Evidence Extraction (ABSA):**
-   The prompt requires the LLM to output `evidence_quote` (an exact verbatim substring from the review). If the evidence cannot be grounded in the source text, it is discarded.
-4. **Human-in-the-Loop (HITL) Quarantine Queue:**
-   Conflicted or low-confidence predictions bypass automatic analytics and are routed to a human verification dashboard for sign-off.
-5. **Strict JSON Schema Enforcement:**
-   Using OpenAI's `response_format={"type": "json_object"}` and Pydantic validation ensures the LLM never outputs conversational boilerplate or invalid keys that could break database ingestion.
-
----
-
 ## 🧪 Running Automated Tests
 
 ```bash
